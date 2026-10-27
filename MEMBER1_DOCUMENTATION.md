@@ -234,3 +234,75 @@ Because we are sharing `main`, coordinate with the other two members before push
 ## Privacy note
 
 My packet captures included local network discovery traffic. Payloads can contain device names, local addresses, or other identifying information, so do not commit raw packet dumps or share full payloads publicly. Only capture traffic that you are authorized to analyze.
+
+
+## Member 2 — Packet Parsing and Testing
+
+### 1. Objective
+
+Member 2 was responsible for packet parsing and parser testing in the Mini Packet Analyzer project. The work focused on manually extracting IPv4, TCP, and UDP header information from raw packet bytes without using Scapy to decode these headers.
+
+### 2. Files Worked On
+
+- `parser.py` — improved UDP length validation.
+- `test_parser.py` — added offline tests for invalid, incomplete, and unusual packets.
+
+### 3. Packet Parsing Concepts
+
+**Ethernet header:** The parser reads bytes 12–13 to identify the Ethernet protocol type. The value `0x0800` indicates IPv4.
+
+**IPv4 header:** The first byte contains the IP version in its upper four bits and the header length in its lower four bits. The header length is multiplied by four to obtain the number of bytes.
+
+**Big-endian integers:** Multi-byte fields, such as IP total length and transport ports, are decoded using Python's `int.from_bytes(data, "big")`.
+
+**TCP header:** The parser extracts source and destination ports, sequence number, acknowledgement number, header length, flags, window size, checksum, and payload.
+
+**UDP header:** The parser extracts source and destination ports, UDP length, checksum, and payload. The UDP length includes the eight-byte UDP header.
+
+**Payload:** The parser separates transport headers from the remaining payload bytes.
+
+### 4. Improvements Made
+
+The UDP validation condition in `parser.py` was improved to check that the declared UDP length is at least eight bytes and does not exceed the IPv4 payload length, except when the IPv4 packet is marked as a fragment that may contain only part of the UDP datagram.
+
+The existing dictionary structure returned by `parse_packet()` was preserved to maintain compatibility with the other project modules.
+
+### 5. Tests Added
+
+The following tests were added to `test_parser.py`:
+
+- `test_invalid_packets()` — checks that an incomplete Ethernet frame and a non-IPv4 Ethernet frame are ignored.
+- `test_truncated_ip_header()` — checks that an incomplete IPv4 header is ignored.
+- `test_ipv4_options()` — checks parsing of an IPv4 header containing options.
+- `test_invalid_tcp_header_length()` — checks that an invalid TCP header length does not produce a valid transport result.
+- `test_invalid_udp_length()` — checks that a UDP length smaller than eight bytes is rejected.
+- `test_udp_length_exceeds_ip_payload()` — checks that an unfragmented UDP length exceeding the IPv4 payload length is rejected.
+
+The original TCP and UDP parsing tests were retained.
+
+### 6. Verification
+
+The following commands were run successfully during development:
+
+```text
+python test_parser.py
+All parser tests passed!
+```
+
+```text
+git diff --check
+```
+
+The parser tests were run locally on Windows using Python 3.13 and Scapy 2.8.0. The tests construct sample packet bytes locally and do not require live network capture.
+
+### 7. GitHub Contribution
+
+The changes were committed on the `parser-feature` branch with commit message:
+
+`Improve packet parser validation and tests`
+
+The branch was pushed to GitHub for review before merging into `main`.
+
+### 8. Limitations and Further Testing
+
+The offline tests cover selected valid and invalid packet cases. Additional testing is still recommended for truncated packet payloads, fragmented IPv4 packets, and other malformed headers. Passing the current tests does not guarantee that every malformed packet is handled correctly.
