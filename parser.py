@@ -99,7 +99,10 @@ def parse_packet(raw_packet, number, timestamp):
         udp_length = int.from_bytes(ip_payload[4:6], "big")
         udp_checksum = int.from_bytes(ip_payload[6:8], "big")
 
-        if udp_length >= 8:
+        if udp_length >= 8 and (
+            udp_length <= total_length - ip_header_length
+            or (fragment_field & 0x2000)
+        ):
             payload_end = min(udp_length, len(ip_payload))
             payload = ip_payload[8:payload_end]
             transport = {
