@@ -1,12 +1,31 @@
 """Capture raw packet bytes. Header parsing is done separately in parser.py."""
 
 from datetime import datetime
-from scapy.all import sniff, get_if_list
+from scapy.all import sniff, conf, get_working_ifaces
 
 
 def list_interfaces():
-    """Return network interface names available to Scapy."""
-    return get_if_list()
+    """Return the network interfaces available to Scapy.
+
+    Each item is a dictionary with a short name to type (for example "Wi-Fi"
+    on Windows or "en0" on macOS), a description and the interface's IPv4
+    address. On Windows the short name replaces long names such as
+    \\Device\\NPF_{GUID}.
+    """
+    interfaces = []
+    for interface in get_working_ifaces():
+        interfaces.append({
+            "name": interface.name,
+            "description": interface.description or "",
+            "ip": interface.ip or "",
+        })
+    return interfaces
+
+
+def default_interface():
+    """Return the name of the interface Scapy would use by default, or None."""
+    interface = conf.iface
+    return getattr(interface, "name", None) or (str(interface) if interface else None)
 
 
 def capture_packets(interface, packet_count=50, duration=15):

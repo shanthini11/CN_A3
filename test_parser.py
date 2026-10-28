@@ -142,6 +142,53 @@ def test_udp_length_exceeds_ip_payload():
     assert packet["src_port"] is None
     assert packet["dst_port"] is None
 
+
+def test_udp_fragments():
+    # UDP length 100 is larger than this IP packet, which is allowed only
+    # for the first fragment (More Fragments flag set, offset 0).
+    udp_header = (
+        (1234).to_bytes(2, "big")
+        + (53).to_bytes(2, "big")
+        + (100).to_bytes(2, "big")
+        + b"\x00\x00"
+    )
+    raw = bytearray(make_packet(17, udp_header, b"ABCD"))
+    raw[20:22] = (0x2000).to_bytes(2, "big")  # IP flags/offset field: MF set.
+
+    packet = parse_packet(bytes(raw), 8, "12:00:07")
+    assert packet["transport"]["length"] == 100
+    assert packet["payload"] == b"ABCD"
+
+    # A later fragment (offset not 0) has no UDP header, so it is not decoded.
+    raw[20:22] = (0x2000 | 185).to_bytes(2, "big")
+    packet = parse_packet(bytes(raw), 9, "12:00:08")
+    assert packet["ip"]["fragment_offset"] == 185
+    assert packet["transport"] is None
+    assert packet["src_port"] is None
+
+
+def test_vlan_tagged():
+    # 802.1Q: EtherType 0x8100, then 2 bytes of VLAN ID, then the real EtherType.
+    udp_header = (
+        (53).to_bytes(2, "big")
+        + (53000).to_bytes(2, "big")
+        + (10).to_bytes(2, "big")
+        + b"\x00\x00"
+    )
+    normal = make_packet(17, udp_header, b"HI")
+    tagged = normal[:12] + b"\x81\x00\x00\x05" + normal[12:]
+
+    packet = parse_packet(tagged, 10, "12:00:09")
+    assert packet is not None
+    assert packet["size"] == len(normal) + 4
+    assert packet["src_ip"] == "192.168.1.10"
+    assert packet["src_port"] == 53
+    assert packet["payload"] == b"HI"
+
+    # A VLAN tag carrying IPv6 (0x86DD) is still skipped.
+    assert parse_packet(normal[:12] + b"\x81\x00\x00\x05\x86\xdd" + b"\x00" * 40, 11, "t") is None
+
+
 if __name__ == "__main__":
     test_tcp()
     test_udp()
@@ -151,4 +198,6 @@ if __name__ == "__main__":
     test_invalid_tcp_header_length()
     test_invalid_udp_length()
     test_udp_length_exceeds_ip_payload()
+    test_udp_fragments()
+    test_vlan_tagged()
     print("All parser tests passed!")

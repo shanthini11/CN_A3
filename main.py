@@ -1,31 +1,63 @@
 """Main command-line program for the Mini Packet Analyzer."""
 
-from capture import capture_packets, list_interfaces
+from capture import capture_packets, list_interfaces, default_interface
 from parser import parse_packet
 from filters import filter_packets
 from display import show_summary, show_details
 
 
+def choose_interface():
+    """List interfaces by number and return the chosen interface name, or None."""
+    interfaces = list_interfaces()
+    names = [item["name"] for item in interfaces]
+    default = default_interface()
+    if default not in names:
+        default = "en0" if "en0" in names else (names[0] if names else None)
+
+    if interfaces:
+        print("Available network interfaces:")
+        for index, item in enumerate(interfaces, start=1):
+            details = " - ".join(text for text in (item["description"], item["ip"])
+                                 if text and text != item["name"])
+            marker = "  (default)" if item["name"] == default else ""
+            print(f"{index:>2}. {item['name']}" + (f"  [{details}]" if details else "") + marker)
+    else:
+        print("No network interfaces were found. Check the Scapy/Npcap installation.")
+
+    prompt = f"Interface number or name [{default}]: " if default else "Interface name: "
+    choice = input(prompt).strip()
+    if not choice:
+        if default is None:
+            print("No interface selected.")
+        return default
+    if choice.isdigit():
+        if 1 <= int(choice) <= len(interfaces):
+            return names[int(choice) - 1]
+        print(f"Please choose a number from 1 to {len(interfaces)}.")
+        return None
+    return choice
+
+
 def ask_and_filter(packets):
     print("\nEnter a value to filter by, or press Enter to skip that filter.")
-    protocol = input("Protocol (TCP/UDP): ").strip().upper()
-    if protocol not in ("", "TCP", "UDP"):
-        print("Protocol must be TCP, UDP, or blank. No filter applied.")
-        protocol = ""
-
+    protocol = input("Protocol (TCP/UDP): ").strip()
     source_ip = input("Source IP: ").strip()
     destination_ip = input("Destination IP: ").strip()
     source_port = input("Source port: ").strip()
     destination_port = input("Destination port: ").strip()
 
-    results = filter_packets(
-        packets,
-        protocol=protocol,
-        source_ip=source_ip,
-        destination_ip=destination_ip,
-        source_port=source_port,
-        destination_port=destination_port,
-    )
+    try:
+        results = filter_packets(
+            packets,
+            protocol=protocol,
+            source_ip=source_ip,
+            destination_ip=destination_ip,
+            source_port=source_port,
+            destination_port=destination_port,
+        )
+    except ValueError as error:
+        print(f"Invalid filter: {error} No filter applied.")
+        return
     show_summary(results)
 
 
@@ -49,14 +81,9 @@ def main():
     print("=" * 45)
     print("Capture only on networks you own or are allowed to analyze.\n")
 
-    interfaces = list_interfaces()
-    if interfaces:
-        print("Available network interfaces:")
-        for name in interfaces:
-            print("-", name)
-
-    default_interface = "en0" if "en0" in interfaces else (interfaces[0] if interfaces else "en0")
-    interface = input(f"Interface [{default_interface}]: ").strip() or default_interface
+    interface = choose_interface()
+    if interface is None:
+        return
 
     try:
         packet_count = int(input("Maximum packets to capture [50]: ").strip() or "50")
@@ -78,6 +105,7 @@ def main():
         print("Check the interface name, Scapy installation, and capture permissions.")
         print("Error:", error)
         print("On macOS, try: sudo .venv/bin/python main.py")
+        print("On Windows, install Npcap (https://npcap.com) and, if needed, run the terminal as Administrator.")
         return
 
     packets = []

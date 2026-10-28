@@ -7,17 +7,25 @@ def parse_packet(raw_packet, number, timestamp):
     """Parse an Ethernet frame containing IPv4. Return a dictionary or None.
 
     Only raw bytes are used here. Scapy is not used to decode the headers.
-    This simple version expects a normal 14-byte Ethernet header.
+    This simple version expects a normal 14-byte Ethernet header, or an
+    18-byte header with one 802.1Q VLAN tag.
     """
     if len(raw_packet) < 14:
         return None
 
     # Ethernet header: bytes 12-13 contain the packet type.
     ethernet_type = int.from_bytes(raw_packet[12:14], "big")
+    ip_start = 14
+
+    # 0x8100 means a 4-byte VLAN tag follows (2 bytes 0x8100 + 2 bytes VLAN ID),
+    # so the real packet type is at bytes 16-17 and IPv4 starts 4 bytes later.
+    if ethernet_type == 0x8100 and len(raw_packet) >= 18:
+        ethernet_type = int.from_bytes(raw_packet[16:18], "big")
+        ip_start = 18
+
     if ethernet_type != 0x0800:  # 0x0800 means IPv4.
         return None
 
-    ip_start = 14
     if len(raw_packet) < ip_start + 20:
         return None
 
