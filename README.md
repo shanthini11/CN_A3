@@ -76,5 +76,5 @@ The tests use packet bytes built in the code, so they do not need live capture o
 - `display.py`: summary table and packet detail output.
 - `filters.py`: packet filtering.
 - `test_parser.py`, `test_filters.py`, `test_display.py`: offline tests (see Tests above).
-- `TEAM_TASKS.md`: suggested three-person split and GitHub workflow.
-- `DOCUMENTATION.md`: full project documentation, byte-level parsing explanation, test results and each member's contribution.
+- `DOCUMENTATION.md`: full project documentation, byte-level parsing explanation and test results.
+- `Report A3.docx`: assignment report with test screenshots and each member's contribution.
